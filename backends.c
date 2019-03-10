@@ -32,6 +32,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include "backends.h"
+ #include "mosquitto.h"
 
 /*
  * Search through `in' for tokens %c (clientid) and %u (username); build a
@@ -84,19 +85,23 @@ void t_expand(const char *clientid, const char *username, const char *in, char *
 
 
 
-int mosquitto_auth_sub_topic_matches_acl(const char *sub_topic, const char *acl_topic, int *result)
+/*
+ * Compares an ACL topic filter with a requested subscribe filter to see if the subscription is allowed.
+ */
+
+int mosquitto_auth_sub_topic_matches_acl(const char *acl_topic, const char *req_topic, int *result)
 {
 	if(!result) {
 		*result = FALSE;
 		return MOSQ_ERR_INVAL;
 	}
 
-	if(!sub_topic || !acl_topic) {
+	if(!req_topic || !acl_topic) {
 		*result = FALSE;
 		return MOSQ_ERR_INVAL;
 	}
 
-	if(mosquitto_sub_topic_check(sub_topic) != MOSQ_ERR_SUCCESS) {
+	if(mosquitto_sub_topic_check(req_topic) != MOSQ_ERR_SUCCESS) {
 		*result = FALSE;
 		return MOSQ_ERR_INVAL;
 	}
@@ -106,27 +111,27 @@ int mosquitto_auth_sub_topic_matches_acl(const char *sub_topic, const char *acl_
 		return MOSQ_ERR_INVAL;
 	}
 
-	if((*sub_topic == '$' && *acl_topic != '$') || (*acl_topic == '$' && *sub_topic != '$')) {
+	if((*req_topic == '$' && *acl_topic != '$') || (*acl_topic == '$' && *req_topic != '$')) {
 		*result = FALSE;
 		return MOSQ_ERR_SUCCESS;
 	}
 
-	while(*sub_topic && *acl_topic) {
-		bool check_equiv;
+	while(*req_topic && *acl_topic) {
+		int check_equiv;
 
 		//Process the # if it exists here.
 		if(*acl_topic == '#') {
 			//No need to check any further. The ACL has a #.
 			*result = TRUE;
 			return MOSQ_ERR_SUCCESS;
-		} else if(*sub_topic == '#') {
+		} else if(*req_topic == '#') {
 			//The user subscribed with a #, but the ACL does not allow that.
 			*result = FALSE;
 			return MOSQ_ERR_SUCCESS;
 		}
 
 		//Process the + if it exists here.
-		if(*sub_topic == '+') {
+		if(*req_topic == '+') {
 			//The subscription includes a single-level wild card. Check to see if that is allowed.
 			if(*acl_topic == '+') {
 				//The ACL allows for a + here. We need to move on to the next level without checking for equivalence.
@@ -150,7 +155,7 @@ int mosquitto_auth_sub_topic_matches_acl(const char *sub_topic, const char *acl_
 
 		//Get the length of the current sub topic level.
 		int sub_level_length = 0;
-		while(sub_topic[sub_level_length] && (sub_topic[sub_level_length] != '/')) {
+		while(req_topic[sub_level_length] && (req_topic[sub_level_length] != '/')) {
 			sub_level_length++;
 		}
 
@@ -169,7 +174,7 @@ int mosquitto_auth_sub_topic_matches_acl(const char *sub_topic, const char *acl_
 			}
 
 			//Lengths are the same, so we need to check the contents.
-			if(memcmp(sub_topic, acl_topic, sub_level_length)) {
+			if(memcmp(req_topic, acl_topic, sub_level_length)) {
 				*result = FALSE;
 				return MOSQ_ERR_SUCCESS;
 			}
@@ -177,21 +182,21 @@ int mosquitto_auth_sub_topic_matches_acl(const char *sub_topic, const char *acl_
 		}
 
 		//Increment pointers
-		sub_topic += sub_level_length;
+		req_topic += sub_level_length;
 		acl_topic += acl_level_length;
 
 		//If we haven't incremented to the null terminator, go one more to get past the '/'.
 		// Only do this if both topics have not reached the end to avoid covering up situation
 		// where one topic is longer than the other.
-		if(*sub_topic && *acl_topic) {
-			sub_topic++;
+		if(*req_topic && *acl_topic) {
+			req_topic++;
 			acl_topic++;
 		}
 	}
 
 
 	//If we hit the null terminator on one and not the other, we don't have a match.
-	if((*sub_topic != 0) ^ (*acl_topic != 0))
+	if((*req_topic != 0) ^ (*acl_topic != 0))
 	{
 		*result = FALSE;
 		return MOSQ_ERR_SUCCESS;
