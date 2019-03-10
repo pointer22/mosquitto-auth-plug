@@ -345,34 +345,24 @@ bool be_mongo_check_acl_topics_map(const bson_iter_t *topics, const char *req_to
 	bson_iter_recurse(topics, &iter);
 	bool granted = false;
 
-	printf("\n\n\n\r");
-	printf("req_access: %i\n\r", req_access);
-
 	// Loop through mapped topics, allowing for the fact that a two different ACLs may have complementary permissions.
 	while (bson_iter_next(&iter) && !granted) {
 		const char *permitted_topic = bson_iter_key(&iter);
-		printf("permitted_topic: %s\n\r", permitted_topic);
 		int topic_matches = FALSE;
 
 		char *expanded;
 
 		t_expand(clientid, username, permitted_topic, &expanded);
 		if (expanded && *expanded) {
-			printf("got here\n\r");
-			printf("expanded (%lu): %s\n\r", strlen(expanded), expanded);
-			printf("req_topic (%lu): %s\n\r", strlen(req_topic), req_topic);
-			printf("mosquitto_auth_sub_topic_matches_acl: %i\n\r", mosquitto_auth_sub_topic_matches_acl(expanded, req_topic, &topic_matches));
 			free(expanded);
 
 			if (topic_matches) {
-				printf("topic matches\n\r");
 				bson_type_t val_type = bson_iter_type(&iter);
 				if (val_type == BSON_TYPE_UTF8) {
 					// NOTE: can req_access be any other value than 1 or 2?
 					// in that case this may not be correct:
 					// e.g. req_access == 3 (rw) -> granted = (3 & 1 > 0) == true
 					const char *permission = bson_iter_utf8(&iter, NULL);
-					printf("permission: %s\n\r", permission);
 					if (strcmp(permission, "r") == 0) {
 						granted = (req_access & 5) > 0;
 					} else if (strcmp(permission, "w") == 0) {
