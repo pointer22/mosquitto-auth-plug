@@ -321,7 +321,7 @@ bool be_mongo_check_acl_topics_array(const bson_iter_t *topics, const char *req_
 
 	while (bson_iter_next(&iter)) {
 		const char *permitted_topic = bson_iter_utf8(&iter, NULL);
-		bool topic_matches = false;
+		int topic_matches = FALSE;
 
 		char *expanded;
 
@@ -345,6 +345,7 @@ bool be_mongo_check_acl_topics_map(const bson_iter_t *topics, const char *req_to
 	bson_iter_recurse(topics, &iter);
 	bool granted = false;
 
+
 	// Loop through mapped topics, allowing for the fact that a two different ACLs may have complementary permissions.
 	while (bson_iter_next(&iter) && !granted) {
 		const char *permitted_topic = bson_iter_key(&iter);
@@ -354,6 +355,7 @@ bool be_mongo_check_acl_topics_map(const bson_iter_t *topics, const char *req_to
 
 		t_expand(clientid, username, permitted_topic, &expanded);
 		if (expanded && *expanded) {
+			mosquitto_auth_sub_topic_matches_acl(expanded, req_topic, &topic_matches);
 			free(expanded);
 
 			if (topic_matches) {
