@@ -87,46 +87,47 @@ void t_expand(const char *clientid, const char *username, const char *in, char *
 
 /*
  * Compares an ACL topic filter with a requested subscribe filter to see if the subscription is allowed.
+ * Sets *result to 1 if a match is found and false otherwise.
  */
 
-int mosquitto_auth_sub_topic_matches_acl(const char *acl_topic, const char *req_topic, bool *result)
+int mosquitto_auth_sub_topic_matches_acl(const char *acl_topic, const char *req_topic, int *result)
 {
 	if(!result) {
-		*result = false;
+		*result = FALSE;
 		return MOSQ_ERR_INVAL;
 	}
 
 	if(!req_topic || !acl_topic) {
-		*result = false;
+		*result = FALSE;
 		return MOSQ_ERR_INVAL;
 	}
 
 	if(mosquitto_sub_topic_check(req_topic) != MOSQ_ERR_SUCCESS) {
-		*result = false;
+		*result = FALSE;
 		return MOSQ_ERR_INVAL;
 	}
 
 	if(mosquitto_sub_topic_check(acl_topic) != MOSQ_ERR_SUCCESS) {
-		*result = false;
+		*result = FALSE;
 		return MOSQ_ERR_INVAL;
 	}
 
 	if((*req_topic == '$' && *acl_topic != '$') || (*acl_topic == '$' && *req_topic != '$')) {
-		*result = false;
+		*result = FALSE;
 		return MOSQ_ERR_SUCCESS;
 	}
 
 	while(*req_topic && *acl_topic) {
-		bool check_equiv;
+		int check_equiv;
 
 		//Process the # if it exists here.
 		if(*acl_topic == '#') {
 			//No need to check any further. The ACL has a #.
-			*result = true;
+			*result = TRUE;
 			return MOSQ_ERR_SUCCESS;
 		} else if(*req_topic == '#') {
 			//The user subscribed with a #, but the ACL does not allow that.
-			*result = false;
+			*result = FALSE;
 			return MOSQ_ERR_SUCCESS;
 		}
 
@@ -135,10 +136,10 @@ int mosquitto_auth_sub_topic_matches_acl(const char *acl_topic, const char *req_
 			//The subscription includes a single-level wild card. Check to see if that is allowed.
 			if(*acl_topic == '+') {
 				//The ACL allows for a + here. We need to move on to the next level without checking for equivalence.
-				check_equiv = false;
+				check_equiv = FALSE;
 			} else {
 				//The ACL doesn't allow for a + in this position.
-				*result = false;
+				*result = FALSE;
 				return MOSQ_ERR_SUCCESS;
 			}
 		} else {
@@ -146,10 +147,10 @@ int mosquitto_auth_sub_topic_matches_acl(const char *acl_topic, const char *req_
 			//If the ACL has a single level wildcard, no need to check anything else at this level.
 			if(*acl_topic == '+') {
 				//The ACL allows for a + here. We need to move on to the next level without checking for equivalence.
-				check_equiv = false;
+				check_equiv = FALSE;
 			} else {
 				//No wildcards. We need to compare to make sure the topic level for both topic filters are identical.
-				check_equiv = true;
+				check_equiv = TRUE;
 			}
 		}
 
@@ -169,13 +170,13 @@ int mosquitto_auth_sub_topic_matches_acl(const char *acl_topic, const char *req_
 		if(check_equiv) {
 			//First check to see if the lengths of the levels are identical. If not, we know we don't have a match.
 			if(sub_level_length != acl_level_length) {
-				*result = false;
+				*result = FALSE;
 				return MOSQ_ERR_SUCCESS;
 			}
 
 			//Lengths are the same, so we need to check the contents.
 			if(memcmp(req_topic, acl_topic, sub_level_length)) {
-				*result = false;
+				*result = FALSE;
 				return MOSQ_ERR_SUCCESS;
 			}
 		} else {
@@ -198,11 +199,11 @@ int mosquitto_auth_sub_topic_matches_acl(const char *acl_topic, const char *req_
 	//If we hit the null terminator on one and not the other, we don't have a match.
 	if((*req_topic != 0) ^ (*acl_topic != 0))
 	{
-		*result = false;
+		*result = FALSE;
 		return MOSQ_ERR_SUCCESS;
 	}
 
 	//Topics match.
-	*result = true;
+	*result = TRUE;
 	return MOSQ_ERR_SUCCESS;
 }

@@ -352,7 +352,7 @@ bool be_mongo_check_acl_topics_map(const bson_iter_t *topics, const char *req_to
 	while (bson_iter_next(&iter) && !granted) {
 		const char *permitted_topic = bson_iter_key(&iter);
 		printf("permitted_topic: %s\n\r", permitted_topic);
-		bool topic_matches = false;
+		int topic_matches = FALSE;
 
 		char *expanded;
 
